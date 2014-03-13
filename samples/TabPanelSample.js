@@ -49,7 +49,8 @@ enyo.kind({
 		},
 		{
 			kind:"DynamicTabPanel",
-			name: 'dynamicTP'
+			name: 'dynamicTP',
+			maxMenuHeight: 200
 		},
 		{
 			kind: 'onyx.Button',
@@ -76,12 +77,18 @@ enyo.kind({
 		this.log("adding a tab");
 		var date = new Date();
 		var delta = ( date.getTime() - this.creationTime ) / 1000 ;
-
+		var tooltipMessage = "";
+		var contentForTooltip = " and doesn't have a tooltip";
+		if(this.number % 2){
+			tooltipMessage = "I'm a odd tab => " + this.number;
+			contentForTooltip = " and has a tooltip";
+		}
 		var added = this.$.dynamicTP.createComponent(
 			{
 				'caption': 'Tab label ' + this.number++ ,
+				'tooltipMsg': tooltipMessage,
 				style: "border: 2px solid grey; padding: 20px;",
-				content: "tab created after " + delta + " seconds"
+				content: "tab created after " + delta + " seconds" + contentForTooltip
 			}
 		) ;
 		this.render() ;

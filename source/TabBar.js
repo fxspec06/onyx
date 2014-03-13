@@ -1,6 +1,9 @@
-﻿/**
+﻿/*global enyo */
+
+/**
 enyo.TabBar is a scrolled set of radio buttons that is used by TabPanels. This bar may
-be used by other kinds to provide a similar layout
+be used by other kinds to provide a similar layout. By default, a tap on a tab will
+immediately switch tab and fire a "onTabChanged" event.
 
 
 Here's an example:
@@ -43,15 +46,43 @@ Tabs must be created after construction, i.e. in rendered function.
 If tabs are created in 'create' function, the last created tabs will
 not be selected.
 
+You can also setup the TabBar so a tap on a tab will fire a
+"onTabChangeRequest" event:
+
+ enyo.kind({
+		name: "App",
+		fit: true,
+		components: [
+			{name:"bar",kind: "onyx.TabBar", checkBeforeChanging: true },
+			{kind: "MyStuff"}
+		],
+
+        handlers: {
+			onTabChangeRequest: "switchStuff"
+		},
+
+        // same rendered function as above
+		switchStuff: function(inSender,inEvent) {
+			this.log("Tapped tab with caption "+ inEvent.caption
+				+ " and message " + inEvent.data.msg );
+			// do switch
+			inEvent.next();
+		}
+	});
+
+In this mode, no event is fired *after* the actual switch.
+
+
 */
 
 enyo.kind ({
 	name: 'onyx.TabBar',
-	kind: "FittableColumns",
+	kind: "enyo.FittableColumns",
 	isPanel: true,
 	classes: "onyx-tab-bar",
 
 	checkBeforeClosing: false,
+	checkBeforeChanging: false,
 
 	debug: false,
 
@@ -72,12 +103,25 @@ enyo.kind ({
 		onTabChanged: "",
 
 		/**
+		Fired when a tab different from the one currently selected is tapped
+		when checkBeforeChanging is true.
+		inEvent contains the same structure as onTabChanged event. Call next()
+		when the tab change can be completed.
+
+		 */
+
+		onTabChangeRequested: "",
+
+		/**
 		 * Fired when a tab is about to be removed. inEvent
 		 * contains the same data as onTabChanged.
 		 *
 		 * if (removeOk) { inEvent.next() ;}
 		 * else ( inEvent.next('not now') ;}
 		 *
+		 * Once a tab is removed (by calling next() ), a replacement
+		 * tab will be activated and a doTabChanged event will be
+		 * fired.
 		 */
 		onTabRemoveRequested: "",
 
@@ -88,39 +132,80 @@ enyo.kind ({
 		onTabRemoved: ""
 	},
 
+	/**
+	 * Set a maximum height for the scrollable menu that can be raised on the right of
+	 * the tab bar.
+	 */
+	published: {
+		maxMenuHeight: 600
+	},
+
 	handlers: {
-		onTabCloseRequest: "requestTabClose"
+		onShowTooltip: "showTooltip",
+		onHideTooltip: "hideTooltip"
 	},
 
 	components: [
 		{
-			name: "scroller",
-			kind: "Scroller",
-			fit:true,
-			maxHeight: "100px",
-
-			// FIXME: may need to be revisited for desktop
-			// activate calls scrollIntoView, which call strategy.scroll
-			// this method is implemented *only* in TransitionScrollStrategy
-			// which may be an enyo bug (ENYO-2303)
-			strategyKind: "TransitionScrollStrategy",
-			//strategyKind: "TranslateScrollStrategy",
-
-			thumb: false,
-			vertical: "hidden",
-			horizontal: "auto",
-			classes: "onyx-tab-bar-scroller",
+			fit:true, 
 			components: [
 				{
-					name: "tabs",
-					classes: 'onyx-tab-holder',
-					kind: "onyx.RadioGroup",
-					defaultKind: "onyx.TabBar.Item",
-					style: "text-align: left; white-space: nowrap;",
-					onTabActivated: 'switchTab'
+					name: "scroller",
+					kind: "enyo.Scroller",
+					
+					maxHeight: "100px",
+
+					touch: true,
+
+					thumb: false,
+					vertical: "hidden",
+					horizontal: "auto",
+					classes: "onyx-tab-bar-scroller",
+					components: [
+						{
+							classes: "onyx-tab-wrapper",
+							components: [
+								{
+									// double level of components is required to add padding
+									// at this level. This avoid "> div" in selectors
+									components: [
+										{
+											name: "tabs",
+											classes: 'onyx-tab-holder',
+											kind: "onyx.RadioGroup",
+											defaultKind: "onyx.TabBar.Item",
+											style: "text-align: left; white-space: nowrap;",
+											onTabCloseRequest: "requestTabClose",
+											onTabSwitchRequest: 'requestTabSwitch'
+										},
+										{ classes: "onyx-tab-line"},
+										{ classes: "onyx-tab-rug"}
+									]
+								}
+							]
+						}
+					]
 				},
-				{ classes: "onyx-tab-line"},
-				{ classes: "onyx-tab-rug"}
+				{kind: "onyx.TooltipDecorator", components:[
+					{kind: "onyx.Tooltip", classes: "onyx-tab-tooltip"}
+				]}
+			]
+
+		},
+		{
+			kind: "onyx.MenuDecorator",
+			name: "tabPicker",
+			onSelect: "popupButtonTapped",
+			components: [
+				{
+					kind: "onyx.IconButton",
+					classes: "onyx-more-button",
+					ontap: "showPopupAtEvent"
+				},
+				{
+					kind: "onyx.Menu",
+					name: "popup"
+				}
 			]
 		}
 	],
@@ -145,6 +230,16 @@ enyo.kind ({
 		return true;
 	},
 
+	create: function () {
+		this.inherited(arguments);
+		this.maxMenuHeightChanged();
+	},
+
+	maxMenuHeightChanged: function() {
+		this.$.popup.setMaxHeight(this.getMaxMenuHeight());
+	},
+
+
 	rendered: function() {
 		this.inherited(arguments);
 		this.resetWidth();
@@ -167,6 +262,7 @@ enyo.kind ({
 			{
 				content:  c,
 				userData: inControl.data || { },
+				tooltipMsg: inControl.tooltipMsg, //may be null
 				userId:   inControl.userId, // may be null
 				tabIndex: this.selectedId,
 				addBefore: this.$.line
@@ -225,14 +321,14 @@ enyo.kind ({
 			replacementTab.setActive(true) ;
 			replacementTab.raise();
 			this.$.scroller.scrollIntoView(replacementTab);
-			this.doTabChanged(
-				{
-					index:   replacementTab.index,
-					caption: replacementTab.caption,
-					data:    replacementTab.userData,
-					userId:  replacementTab.userId
-				}
-			);
+
+			this.doTabChanged({
+				index:   replacementTab.tabIndex,
+				caption: replacementTab.content,
+				tooltipMsg: replacementTab.tooltipMsg,
+				data:    replacementTab.userData,
+				userId:  replacementTab.userId
+			});
 		}
 
 		this.doTabRemoved(tabData);
@@ -253,6 +349,7 @@ enyo.kind ({
 		var tabData = {
 			index:   tab.tabIndex,
 			caption: tab.content,
+			tooltipMsg: tab.tooltipMsg,
 			userId:  tab.userId,
 			data:    tab.userData
 		} ;
@@ -334,33 +431,83 @@ enyo.kind ({
 	activate: function(target) {
 		var tab = this.resolveTab(target,'activate');
 		if (tab) {
-			tab.setActive(true) ;
-			this.$.scroller.scrollIntoView(tab);
+			this.raiseTab(tab);
 		}
 	},
 
-	//* @protected
-	switchTab: function(inSender, inEvent) {
-		var oldIndex = this.selectedId ;
-		this.selectedId = inEvent.index;
-		if ( this.selectedId != oldIndex ) {
-			this.doTabChanged(
-				{
-					index:   inEvent.index,
-					caption: inEvent.caption,
-					data:    inEvent.userData,
-					userId:  inEvent.userId,
-					next:    enyo.bind(this,'undoSwitchOnError', oldIndex)
-				}
-			);
+	raiseTab: function(tab) {
+		tab.setActive(true) ;
+		this.$.scroller.scrollIntoView(tab);
+	},
+
+	//@ protected
+	requestTabSwitch: function(inSender,inEvent) {
+		var tab = inEvent.originator;
+		this._requestTabSwitch(tab);
+	},
+
+	_requestTabSwitch: function(tab) {
+		var event, next;
+
+		if (this.checkBeforeChanging) {
+			// polite mode, ask before
+			event = 'onTabChangeRequested';
+			// then change the tab
+			next = enyo.bind(tab, tab.setActiveTrue);
+		} else {
+			// rough mode, change the tab
+			tab.setActiveTrue();
+			event = 'onTabChanged';
+			// and then undo if necessary
+			next =  enyo.bind(this,'undoSwitchOnError', oldIndex);
 		}
+
+		var data = {
+			index:   tab.tabIndex,
+			caption: tab.content,
+			tooltipMsg: tab.tooltipMsg,
+			data:    tab.userData,
+			userId:  tab.userId
+		} ;
+
+		var oldIndex = this.selectedId ;
+		this.selectedId = data.index;
+
+		if ( this.selectedId != oldIndex ) {
+			data.next = next;
+			this.bubble(event, data);
+		}
+		else {
+			// when clicking on a tab, the tab is always deactivated even
+			// if user clicks on the active tab. So the activation
+			// must be put back.
+			tab.setActiveTrue();
+		}
+		return true;
+	},
+
+	showTooltip: function(inSender, inEvent) {
+		var t = inEvent.tooltipContent;
+		var bounds = inEvent.bounds;
+		if(t){
+			if(!this.$.tooltip.showing){
+				this.$.tooltip.setContent(t);
+				var leftSpace = bounds.left + ( bounds.width / 2 );
+				this.$.tooltipDecorator.applyStyle("left", leftSpace + "px");
+				this.$.tooltip.show();
+			}
+		}
+		return true ;
+	},
+
+	hideTooltip: function() {
+		this.$.tooltip.hide();
 		return true ;
 	},
 
 	//* @protected
 	undoSwitchOnError: function(oldIndex, err) {
 		if (err) {
-			this.log("app requested to activate back tab index "+ oldIndex + " because ",err);
 			this.activate({ 'index': oldIndex } ) ;
 		}
 	},
@@ -412,5 +559,44 @@ enyo.kind ({
 
 	isEmpty: function() {
 		return ! this.$.tabs.getControls().length ;
+	},
+
+	// Since action buttons of Contextual Popups are not dynamic, this
+	// kind is created on the fly and destroyed once the user clicks
+	// on a button
+	showPopupAtEvent: function(inSender, inEvent) {
+		var that = this ;
+		var popup = this.$.popup;
+
+		for (var name in popup.$) {
+			if (popup.$.hasOwnProperty(name) && /menuItem/.test(name)) {
+				popup.$[name].destroy();
+			}
+		}
+
+		//popup.render();
+		enyo.forEach(
+			this.$.tabs.getControls(),
+			function(tab){
+				that.$.popup.createComponent({
+					content: tab.content,
+					value: tab.tabIndex
+				}) ;
+			}
+		);
+
+		popup.maxHeightChanged();
+		popup.showAtPosition({top: 30, right:30});
+		this.render();
+		this.resized(); // required for IE10 to work correctly
+		return ;
+	},
+
+	popupButtonTapped: function(inSender, inEvent) {
+		var target = { index: inEvent.originator.value } ;
+		var tab = this.resolveTab(target,'activate');
+		if (tab) {
+			this._requestTabSwitch(tab);
+		}
 	}
 });

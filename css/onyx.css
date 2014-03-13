@@ -1,5 +1,5 @@
 /* WARNING: This is a generated file for backward-compatibility.  Most      */
-/* usrs should instead modify LESS files.  If you choose to edit this CSS   */
+/* users should instead modify LESS files.  If you choose to edit this CSS  */
 /* directly rather than LESS files, you should make sure less.xx.yy.min.js  */
 /* is commented out in your debug.html, and run deploy.sh/bat using the     */
 /* '-c' flag to disable LESS compilation.  This will force the loader and   */
@@ -64,16 +64,12 @@
 }
 .onyx-icon.onyx-icon-button.active,
 .onyx-icon.onyx-icon-button.pressed,
-.onyx-icon.onyx-icon-button:active:hover,
 .onyx-icon-toggle.active {
   background-position: 0 -32px;
 }
 .onyx-icon.disabled {
   opacity: 0.4;
   filter: alpha(opacity=40);
-}
-.onyx-icon.disabled:active:hover {
-  background-position: 0 0px;
 }
 /* Button.css */
 .onyx-button {
@@ -122,12 +118,6 @@
 */
 .onyx-button.active,
 .onyx-button.pressed {
-  background-image: url("../images/gradient-invert.png");
-  background-position: top;
-  border-top: 1px solid rgba(15, 15, 15, 0.6);
-  box-shadow: inset 0px 1px 0px rgba(0, 0, 0, 0.1);
-}
-.onyx-button:active:hover:not([disabled]) {
   background-image: url("../images/gradient-invert.png");
   background-position: top;
   border-top: 1px solid rgba(15, 15, 15, 0.6);
@@ -198,6 +188,10 @@
   border-radius: 0;
   margin: 0;
   font-size: 16px;
+}
+/* needed for MathJax support */
+.onyx-groupbox > script {
+  display: none;
 }
 .onyx-groupbox > *:first-child {
   border-top-color: #aaaaaa;
@@ -514,17 +508,18 @@
 /* TabBar.css */
 .onyx-tab-bar {
   width: 100%;
-  position: relative;
-  z-index: 0;
+  z-index: 10;
   background-color: #cacaca;
   padding-top: 1px;
 }
 .onyx-tab-bar-scroller {
   padding-top: 2px;
 }
-.onyx-tab-bar-scroller .enyo-touch-scroller > div {
+.onyx-tab-bar-scroller > .enyo-thumb {
+  border: 0px;
+}
+.onyx-tab-wrapper {
   padding: 3px 0px 3px 0px;
-  width: 100%;
 }
 .onyx-tab-line {
   position: relative;
@@ -548,7 +543,7 @@
   border-top-left-radius: 5px;
   background-color: #b1b1b1;
   z-index: 1;
-  padding-top: 0.3em;
+  padding-top: 0.2em;
   padding-bottom: 0.7em ;
   vertical-align: baseline;
 }
@@ -556,6 +551,7 @@
   border-bottom: 1px solid #cacaca;
   background-color: #cacaca;
   z-index: 3;
+  padding-top: 0.3em;
 }
 .onyx-tab-item:hover {
   background-color: #cacaca;
@@ -571,7 +567,7 @@
   height: 90%;
   width: 2em;
   top: 2px;
-  right: 1em;
+  right: 19px;
   position: absolute;
   background: linear-gradient(to right, #b1b1b1 0%, rgba(177, 177, 177, 0) 100%);
   /* W3C */
@@ -738,6 +734,11 @@
   vertical-align: middle;
   margin: 4px 6px 5px;
   box-sizing: border-box;
+}
+/* needed for MathJax support */
+.onyx-toolbar-inline > script,
+.enyo-fittable-columns-layout.onyx-toolbar-inline > script {
+  display: none;
 }
 .onyx-toolbar .onyx-icon-button {
   margin: 3px 2px 1px;
@@ -922,6 +923,10 @@
 .onyx-progress-button-client > * {
   display: inline-block;
 }
+/* needed for MathJax support */
+.onyx-progress-button-client > script {
+  display: none;
+}
 /* Slider.css */
 .onyx-slider {
   position: relative;
@@ -941,8 +946,7 @@
   margin: -23px -20px;
 }
 .onyx-slider-knob.active,
-.onyx-slider-knob.pressed,
-.onyx-slider-knob:active:hover {
+.onyx-slider-knob.pressed {
   background-position: 0 -40px;
 }
 /* RangeSlider.css */
